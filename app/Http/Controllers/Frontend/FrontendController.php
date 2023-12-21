@@ -15,71 +15,78 @@ use URL;
 use Cookie;
 use Validator;
 use PDF;
+use App\Models\SubscriptionHistory;
 
 use Illuminate\Support\Facades\Input;
 
 class FrontendController extends Controller
 {
-   private $partner_id;
+ private $partner_id;
 
-   public function __construct()
-   {
+ public function __construct()
+ {
         //blockio init
 
-   }
+ }
+ public function doLogin(Request $request)
+ {
+    $request->validate([
+        'email' => 'required',
+        'password' => 'required',
+    ]);
 
-   public function sendMail(){
+    $user = User::where('email',$request->email)->first();
 
-    $superAdminInfo = User::findOrFail(1);
-    $info = array(
-        'url' => url('/'),
-        'superadmin_name' => "kjhjhjkhk",
-        'desc' => "sssssssssssssssss",
-        'logo' => url('/').'/public/images/logo.png',
-        'title' => 'New Ticket By ',
-        'ticket_url' => url('/').'/superadmin/tickets/9/edit'
-    ); 
-    $to = "karnailbhutto@gmail.com";
+    if($user){
+        $credentials = $request->only('email', 'password');
 
-    $mailInfo =  Mail::send('email.ticket_generate', $info, function ($message) use($to) {
-      $message->to($to, 'Laravel')
-      ->subject('You have a new ticket found');
-      $message->from("Laravel@Laravel.io", 'Laravel');
-  });
+        if (Auth::attempt($credentials)) {
 
-    die('dine');
+         User::where('id',Auth::user()->id)->update(array('ip_address'=>$request->ip()));
 
+         return redirect('admin');
+     }else{
+         return redirect()->back()->with('error', 'Login details are not valid');
+     }
 
-    $info = array(
-        'name' => "name",
-        'price' => 7,
-        'url' => url('/')        
-    );
-    $from = "mygoogle@gmail.com";
-    $to = "webtesthere@gmail.com";
-
-
-    Mail::send('email.mail', $info, function ($message) use($to, $from) {
-      $message->to($to, 'Laravel')
-      ->subject('Laravel Registration complete');
-      $message->from("Laravel@Laravel.io", 'Laravel');
-  });
-
-
+ }else{
+    return redirect()->back()->with('error', 'Email address not found.');
+}
 }
 
 
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index()
-    {
-       return redirect('login');
-       // $plans = Plan::get(); 
 
-       // return view("frontend.index", compact("plans"));
+function doRegister(Request $request)
+{
+
+    $validator = Validator::make($request->all(), [
+        'name' => 'required',
+            'email' => 'required|email|unique:users,email',   // required and email format validation
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+
+        ]); // create the validations
+        if ($validator->fails())   //check all validations are fine, if not then redirect and show error messages
+        {
+           return redirect('register')->withErrors($validator->errors());
+       } else {
+
+
+            //validations are passed, save new user in database
+         $User = new User;
+         $User->name = $request->name;
+         $User->email = $request->email;
+         $User->role = 'customer';
+         $User->password = bcrypt($request->password);
+         $User->save();
+
+       // \Mail::to($request->email)->send(new \App\Mail\NewRegisterMail($details));
+
+        Auth::attempt(['email' => $request->email, 'password' => $request->password]);
+       Session::flash('success','You have successfully registered!');
+       return redirect('admin?plan=success');
+
    }
-   
+}
+
+
 }
